@@ -7,13 +7,14 @@
 ## 📑 Table of Contents
 - [Overview](#overview)
 - [Pipeline Database Structure](#pipeline-database-structure)
-
+- [Prompt Template Guidelines](#prompt-template-guidelines)
 ---
 
 ## Overview
 
 This pipeline is designed to facilitate seamless and dynamic handling of user input data gathered from the MVC (Model-View-Controller) interface. It performs several critical operations, from validation to extraction and matching, ensuring that each user’s unique data is accurately integrated into pre-defined prompt templates stored within the Data Mart. This pipeline is essential for generating fully-formed LangGraph prompts that can be utilized in downstream applications.
 
+---
 ## Pipeline Database Structure
 
 This section details each table within the ETL pipeline, outlining its purpose, columns, and role in storing key data at each stage of the extraction, validation, and prompt-assembly process.
@@ -102,3 +103,21 @@ This section details each table within the ETL pipeline, outlining its purpose, 
     - **1️⃣_🧑‍💻_PK**: *Lookup Field* — Tracks the unique sequence identifier to maintain traceability.
     - **🔧_JSON_Format_Prompt**: *Lookup Field* — Accesses the JSON-formatted prompt for validation and loading.
   - **📤_Output_Loading**: *Long Text Field* — Stores the processed and cast version of the `🔧_JSON_Format_Prompt`, enhancing loading performance and enabling compatibility with various data targets.
+
+---
+## Prompt Template Guidelines
+
+This section outlines the structure, conventions, and labeling used within each prompt template to ensure consistency and clarity in prompt generation.
+
+### Template Structure
+- **Prompt Format**: Each prompt is structured as a JSON object `{ }`, designed to act as a function that performs a specific role. This standardized format facilitates easy parsing, processing, and transformation throughout the ETL pipeline.
+- **Steps as Top-Level Keys**: Each prompt consists of several steps, where each step title serves as a top-level key within the JSON output. These top-level keys define distinct stages or segments of the prompt’s intended functionality.
+
+- **Prompt Classes**: Within each step, multiple attributes (referred to as "prompt classes") contribute to the final prompt content. These classes are labeled with a square bracket `[...]` to clearly indicate each attribute or element, allowing for organized representation and easier referencing.
+
+### Placeholder Variables
+- **Global Variable Syntax**: In the prompt template content, values that require dynamic input are enclosed within angle brackets `<...>`. Each `<global variable>` represents a specific placeholder that is replaced with user input values during the transformation stage, ensuring tailored and accurate prompt generation.
+  
+By following these conventions, the prompt templates maintain a clear and predictable structure, enabling efficient data injection and processing across the ETL pipeline.
+
+
