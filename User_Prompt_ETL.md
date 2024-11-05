@@ -140,7 +140,7 @@ The **Input Validation** stage verifies the incoming JSON data from the MVC for 
 #### Process Flow and Code Breakdown
 
 1. **Record Retrieval and Field Initialization**
-   - Retrieve the triggered record ID and select the fields required for validation, including `userInputJSON`, `authorizationField`, and `requiredKeysArray`. These fields determine the core elements that need validation.
+  - Retrieve the triggered record ID and select the fields required for validation, including `userInputJSON`, `authorizationField`, and `requiredKeysArray`. These fields determine the core elements that need validation.
 
    ```javascript
    let inputConfig = input.config();
@@ -401,4 +401,224 @@ console.log("JSON content successfully copied to 📤_Output_Loading.");
 ##### Output:
 - **Formatted JSON Prompt**:The 📤_Output_Loading field in 📤_Ouput_Load now contains the finalized JSON prompt, ready for use in the ETL pipeline’s final stages or external applications.
 
+---
+## ETL Pipeline
 
+### Extraction
+
+The **Extraction** function processes and structures incoming user data from the `🧑‍💻_MVC_Input` table. This extraction process standardizes user input data for structured downstream use, ensuring each record is properly validated, formatted, and ready for the Transformation stage.
+
+#### Process Flow and Code Breakdown
+
+1. **Record Identification and Validation**: 
+  - Retrieves the record ID from the input configuration, which uniquely identifies each data entry.
+  - Confirms record existence within the `🖊️_Input_Extracted` table and validates data availability in the `1️⃣_🧑‍💻_INPUT` field, which holds the user input JSON data as a lookup array.
+   
+   ```javascript
+   let inputConfig = input.config();
+   let recordId = inputConfig.recordId;
+   let extractedTable = base.getTable('🖊️_Input_Extracted');
+   let record = await extractedTable.selectRecordAsync(recordId);
+   
+   if (!record) {
+       console.log(`No record found with ID ${recordId}`);
+       return;
+   }
+   ```
+2. **Data Cleaning and Parsing**:
+  - Converts the JSON string in 1️⃣_🧑‍💻_INPUT into a structured format, handling any escape characters or invisible unicode characters.
+  - Parses the cleaned JSON data, using error handling to log any parsing issues.
+
+  ```javascript
+  let userInputJSON = userInputLookup[0];
+  let cleanedJSON = userInputJSON.replace(/\\_/g, '_')
+                                 .replace(/\\/g, '')
+                                 .replace(/[\u200B-\u200D\uFEFF\s]+/g, ' ')
+                                 .trim();
+  
+  let userInput;
+  try {
+      userInput = JSON.parse(cleanedJSON);
+  } catch (error) {
+      console.log("JSON parsing failed: " + error.message);
+      return;
+  }
+  ```
+3. **Dynamic Key Extraction**: 
+  - Defines a helper function findNestedValue to search for specific keys within potentially nested JSON objects, enabling flexible handling of various data structures.
+  - An additional function safeExtractValue is applied to safely extract and format values, converting nested objects into unique strings.
+
+  ```javascript
+  function findNestedValue(obj, key) {
+    if (obj.hasOwnProperty(key)) {
+        return obj[key];
+    }
+    for (let k in obj) {
+        if (typeof obj[k] === 'object') {
+            let result = findNestedValue(obj[k], key);
+            if (result) return result;
+        }
+    }
+    return null;
+}
+
+function safeExtractValue(obj, key) {
+    let value = findNestedValue(obj, key);
+    return value != null ? String(value) : '';
+}
+  ```
+4.**Operation Extraction and Formatting**:
+  - Utilizes extracted data to dynamically construct an operation_request string by capitalizing each part. This creates a descriptive label for the operation request based on the input values, such as Create_Project.
+  
+  ```javascript
+  let operationType = safeExtractValue(userInput.operation_request, "operation_type") || "No operation type found";
+  let requestType = safeExtractValue(userInput.operation_request, "request_type") || "No request type found";
+  let operationExtract = `${capitalize(requestType)}_${capitalize(operationType)}`;
+  ```
+5. **User Profile and Input Data Extraction**:
+  - Extracts relevant sections of user_profile and user_input from the parsed JSON, storing them in separate fields.
+  - Combines the profile and input into a single JSON object, which is formatted as a string to facilitate further processing in downstream stages.
+
+  ```javascript
+  let profileExtract = userInput.user_profile ? JSON.stringify(userInput.user_profile, null, 2) : "No profile data found";
+  let inputExtract = userInput.user_input ? JSON.stringify(userInput.user_input, null, 2) : "No input data found";
+  
+  let combinedExtract = {
+      user_profile: userInput.user_profile || {},
+      user_input: userInput.user_input || {}
+  };
+  ```
+6. **Field Updates**:
+  - Updates the 🖊️_Input_Extracted table with extracted and formatted values:
+     - 🖊️_User_Info holds the combined profile and input data.
+     - 🖊️_Operation_Extract_⚡️ contains the formatted operation request.
+     - 🖊️_Profile_Extract_⚡️ and 🖊️_Input_Extract_⚡️ store the user profile and input data separately.
+     - 🖊️_Process_Status is updated to ‘Completed’ to indicate the extraction process is finished.
+
+   ```javascript
+  await extractedTable.updateRecordAsync(recordId, {
+    '🖊️_User_Info': JSON.stringify(combinedExtract, null, 2),
+    '🖊️_Operation_Extract_⚡️': operationExtract,
+    '🖊️_Profile_Extract_⚡️': profileExtract,
+    '🖊️_Input_Extract_⚡️': inputExtract,
+    '🖊️_Process_Status': {name: 'Completed'}
+  });
+  ```
+
+### Transformation
+
+The Transformation function takes input templates from the `⚙️_User_Template_Combination` field and processes them into structured JSON, ensuring a standardized format for downstream use. This transformation process converts the raw prompt template into a structured JSON format, preserving hierarchy and details for each step and section. This structured format is essential for the next stages in the ETL pipeline.
+
+#### Process Flow and Code Breakdown
+
+1. **Record Identification and Existence Check**:
+  - Retrieves the unique record ID for each entry, ensuring the transformation is targeted at the correct data.
+  - Checks for the existence of the record in the `🔧_Transform_to_JSON` table and verifies data validity in the `⚙️_User_Template_Combination` field, which holds the template data to format. 
+  - If any validation fails, the status updates to “Failed.”
+
+   ```javascript
+   let inputConfig = input.config();
+   let recordId = inputConfig.recordId;
+   let assemblePromptTable = base.getTable('🔧_Transform_to_JSON');
+   let record = await assemblePromptTable.selectRecordAsync(recordId);
+
+   if (!record) {
+       console.log(`No record found with ID ${recordId}`);
+       await assemblePromptTable.updateRecordAsync(recordId, {
+           '🔧_Tansform_Status': { name: 'Failed' }
+       });
+       return;
+   }
+   ```
+2. **Template Parsing and Initial Setup:**:
+  - Retrieves the first value in the ⚙️_User_Template_Combination lookup field, representing the template’s base structure.
+  - Initializes a JSON structure (jsonStructure) to hold the hierarchical format, with top-level indicators (currentStep, currentSecondKey, and currentThirdKey) to manage nesting levels.
+
+   ```javascript
+   let promptTemplateLookup = record.getCellValue('⚙️_User_Template_Combination');
+   let promptTemplate = promptTemplateLookup[0];
+   let jsonStructure = {};
+   let lines = promptTemplate.split('\n');
+   let currentStep = null;
+   let currentSecondKey = null;
+   let currentThirdKey = "Details";
+   let isInsideSelectBlock = false;
+   ```
+3. **Step Parsing**:
+  - Iterates through each line in the template, identifying top-level “Step” markers (e.g., “Step 1:”) and creating JSON objects for each.
+  - Resets currentSecondKey and currentThirdKey when a new step is encountered, ensuring each step starts with a clean structure.
+
+  ```javascript
+   if (line.startsWith('Step')) {
+    currentStep = line.trim();
+    jsonStructure[currentStep] = {};
+    currentSecondKey = null;
+    currentThirdKey = "Details";
+    isInsideSelectBlock = false;
+  }
+  ```
+4. **Section-Level Parsing and Description Handling**:
+  - Identifies second-level sections enclosed in brackets [ ] and uses the content as a key (e.g., [Section Title]). If a line begins with "Description:", it’s processed as a specific “Description” key under the current second-level section.
+  
+  ```javascript
+  else if (line.startsWith('[')) {
+      currentSecondKey = line.replace(/[\[\]]/g, '').trim();
+      if (currentStep) {
+          jsonStructure[currentStep][currentSecondKey] = {};
+      }
+      currentThirdKey = "Details";
+      isInsideSelectBlock = false;
+  }
+  else if (line.startsWith("Description:") && currentStep && currentSecondKey && !isInsideSelectBlock) {
+      const descriptionContent = line.split("Description:")[1].trim();
+      jsonStructure[currentStep][currentSecondKey]["Description"] = descriptionContent;
+  }
+  ```
+5. **Dynamic Block Parsing (| | Sections)**:
+  - Processes sections denoted with | |, interpreting them as third-level keys. Each entry under these keys is stored in an array, and the script recognizes “key: value” pairs to enable flexible formatting.
+
+  ```javascript
+  else if (line.startsWith('|') && line.endsWith('|')) {
+    currentThirdKey = line.replace(/\|/g, '').trim();
+    if (currentStep && currentSecondKey) {
+        jsonStructure[currentStep][currentSecondKey][currentThirdKey] = [];
+        isInsideSelectBlock = true;
+      }
+  }
+  ```
+6. **Handling Default “Details” Section**:
+  - Processes sections denoted with | |, interpreting them as third-level keys. Each entry under these keys is stored in an array, and the script recognizes “key: value” pairs to enable flexible formatting.
+    
+  ```javascript
+  else if (line.startsWith('|') && line.endsWith('|')) {
+    currentThirdKey = line.replace(/\|/g, '').trim();
+    if (currentStep && currentSecondKey) {
+        jsonStructure[currentStep][currentSecondKey][currentThirdKey] = [];
+        isInsideSelectBlock = true;
+    }
+}
+```
+
+7. **JSON Output Generation**:
+  - Logs the final JSON format to verify structure and updates the 🔧_JSON_Format_Prompt field in the 🔧_Transform_to_JSON table, storing the JSON result.
+  - Updates the 🔧_Tansform_Status field to “Completed,” signaling that the transformation stage has finished successfully.
+
+  ```javascript
+  await assemblePromptTable.updateRecordAsync(recordId, {
+    '🔧_JSON_Format_Prompt': JSON.stringify(jsonStructure, null, 2),
+    '🔧_Tansform_Status': { name: 'Completed' }
+});
+```
+  If any errors occur during the transformation process, they are logged, and the status is set to “Failed.”
+  
+  ```javascript
+  } catch (error) {
+    console.log("Error occurred during JSON formatting:", error.message);
+    await assemblePromptTable.updateRecordAsync(recordId, {
+        '🔧_Tansform_Status': { name: 'Failed' }
+    });
+}
+```
+
+
+  
