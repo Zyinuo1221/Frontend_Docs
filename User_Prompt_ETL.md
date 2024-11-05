@@ -133,11 +133,11 @@ By following these conventions, the prompt templates maintain a clear and predic
 
 The **IPO Process** (Input-Process-Output) defines the data flow structure of our ETL pipeline, focusing on validating incoming data, processing it to match pre-defined templates, and formatting the final output. This systematic approach ensures that the pipeline operates efficiently, accurately, and reliably from initial input capture through to the final output formatting. The IPO Process comprises three main stages:
 
-## Input Validation
+### Input Validation
 
 The **Input Validation** stage verifies the incoming JSON data from the MVC for correctness, completeness, and authorization. This ensures all required fields and values are in place before the data proceeds to further ETL stages.
 
-### Process Flow and Code Breakdown
+#### Process Flow and Code Breakdown
 
 1. **Record Retrieval and Field Initialization**
    - Retrieve the triggered record ID and select the fields required for validation, including `userInputJSON`, `authorizationField`, and `requiredKeysArray`. These fields determine the core elements that need validation.
@@ -257,18 +257,18 @@ The **Input Validation** stage verifies the incoming JSON data from the MVC for 
   });
   ```
 
-### Summary
+#### Summary
 The **Input Validation** process performs a structured verification of each incoming record by:
 - Checking JSON integrity and completeness.
 - Validating required fields and authorization.
 - Logging errors for immediate feedback, ensuring inputs meet all criteria before progressing further in the ETL pipeline.
 
-## Template Processing
+### Template Processing
 
 The **Template Processing** stage aligns extracted user data with pre-defined templates from the Data Mart. This process ensures that each prompt output is accurately tailored with relevant user data. The process is split into two primary steps: **Template Matching** and **Dynamic Value Injection**.
 
-### Process Flow and Code Breakdown
-#### 1. Template Matching and Error Handling
+#### Process Flow and Code Breakdown
+##### 1. Template Matching and Error Handling
 The Template Matching process validates and aligns the user’s extracted input with a corresponding prompt template stored in the Data Mart. This ensures that each user request is matched with an appropriate prompt template for further processing.
 
 1. **Retrieve Extracted Operation**: Fetches the extracted operation information from the `🖊️_Extracted_Operation_⚡️` field to locate the relevant template.
@@ -319,7 +319,7 @@ if (matchedOperation) {
 - **Matched Template**: If a match is found, the record in `⚙️_Process_Extracted_to_AssemblePrompt` is linked with the appropriate prompt template from the `📥_Operation_Request` table, based on the operation extracted from user input.
 - **Matching Status**: Updates `⚙️_Matching_Process_Status` to “Completed” if the match is successful. If no match is found or an error occurs, the status is set to “Failed” to halt further processing.
 
-#### 2. Dynamic Value Injection into Prompt Template
+##### 2. Dynamic Value Injection into Prompt Template
 This stage dynamically injects user-specific information into the matched template, preparing it for final output as a LangGraph prompt.
 
 1. **Retrieve Template Content**: Loads the selected template and the user’s JSON data to insert values.
@@ -354,7 +354,7 @@ await assemblePromptTable.updateRecordAsync(recordId, {
 ##### Output:
 - **Usable Prompt**: After dynamic value injection, the prompt template is customized with relevant user data, creating a complete and usable LangGraph prompt stored in `⚙️_User_Template_Combination`. This prompt is now ready for the next stage in the ETL pipeline.
 
-#### 3. Output Formatting
+### Output Formatting
 
 The **Output Formatting** stage finalizes the JSON prompt output by formatting and storing it in a designated field within the `📤_Ouput_Load` table. This ensures the generated prompt content is fully prepared for downstream usage or integration with external systems.
 
