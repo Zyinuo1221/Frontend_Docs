@@ -8,8 +8,16 @@
 - [Overview](#overview)
 - [Pipeline Database Structure](#pipeline-database-structure)
 - [Prompt Template Guidelines](#prompt-template-guidelines)
----
+- [IPO Process (Input-Process-Output)](#ipo-process-input-process-output)
+  - [Input Validation](#input-validation)
+  - [Template Processing](#template-processing)
+  - [Output Formatting](#output-formatting)
+- [ETL Pipeline](#etl-pipeline)
+  - [Extraction](#extraction)
+  - [Transformation](#transformation)
+  - [Loading](#loading)
 
+---
 ## Overview
 
 This pipeline is designed to facilitate seamless and dynamic handling of user input data gathered from the MVC (Model-View-Controller) interface. It performs several critical operations, from validation to extraction and matching, ensuring that each user’s unique data is accurately integrated into pre-defined prompt templates stored within the Data Mart. This pipeline is essential for generating fully-formed LangGraph prompts that can be utilized in downstream applications.
@@ -120,4 +128,31 @@ This section outlines the structure, conventions, and labeling used within each 
   
 By following these conventions, the prompt templates maintain a clear and predictable structure, enabling efficient data injection and processing across the ETL pipeline.
 
+---
+## IPO Process (Input-Process-Output)
 
+The **IPO Process** (Input-Process-Output) defines the data flow structure of our ETL pipeline, focusing on validating incoming data, processing it to match pre-defined templates, and formatting the final output. This systematic approach ensures that the pipeline operates efficiently, accurately, and reliably from initial input capture through to the final output formatting. The IPO Process comprises three main stages:
+
+### Input Validation
+This stage is responsible for validating incoming user inputs to ensure they meet necessary requirements before entering the pipeline. Each input goes through a validation check, confirming its structure, completeness, and the presence of mandatory fields. Error messages and feedback are generated for inputs that fail validation, helping to streamline error resolution and maintain data integrity throughout the pipeline. Key aspects of this stage include:
+
+- **Structure Checks**: Verifying that the input JSON adheres to the required structure.
+- **Mandatory Field Verification**: Confirming that all required fields are populated, such as `user_id`, `role_details`, and `project_objective`.
+- **Authorization Validation**: Checking authorization codes against stored values to verify input authenticity.
+
+```javascript
+// Function: validateInputStructure
+function validateInputStructure(input) {
+    // Logic to verify input structure
+}
+
+// Function: checkMandatoryFields
+function checkMandatoryFields(input) {
+    // Logic to ensure all necessary fields are present
+}
+
+// Function: validateAuthorization
+function validateAuthorization(input, authorizationCode) {
+    // Logic to check authorization validity
+}
+```
