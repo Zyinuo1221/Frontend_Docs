@@ -320,30 +320,50 @@ if (matchedOperation) {
 - **Matching Status**: Updates `⚙️_Matching_Process_Status` to “Completed” if the match is successful. If no match is found or an error occurs, the status is set to “Failed” to halt further processing.
 
 ##### 2. Dynamic Value Injection into Prompt Template
-This stage dynamically injects user-specific information into the matched template, preparing it for final output as a LangGraph prompt.
+This stage dynamically integrates user-specific data into the prompt template, preparing it for use as a complete  prompt.
 
-1. **Retrieve Template Content**: Loads the selected template and the user’s JSON data to insert values.
-2. **Placeholder Replacement**: Identifies <...> placeholders and replaces them with actual values from the userJson.
-3. **Special Handling for project_objective**: Format goal and timeframe as a single string for user clarity.
+1. **Retrieve Template and User Data**: The script loads the designated template content and user-specific JSON data for value extraction and insertion.
+2. **Placeholder Replacement**: Uses regular expressions to identify <...> placeholders within the template and replaces them with corresponding values from userJson.
+3. **Special Handling for project_objective**: When encountering the project_objective key, the script formats the goal and timeframe attributes as a single string to provide a clear and user-friendly message.
 
 ```javascript
-// Extract placeholders and replace with user values
+// Define regular expression to capture placeholders and replace them with user data
 let regex = /<([^>]+)>/g;
-for (let match of promptTemplate.matchAll(regex)) {
+let matches = [...promptTemplate.matchAll(regex)];
+let missingKeys = []; // Track missing keys for logging
+
+for (let match of matches) {
     let placeholder = match[0];
     let key = match[1];
 
+    // Special handling for 'project_objective' key
     if (key.toLowerCase() === "project_objective") {
         let projectObjective = findNestedValue(userJson, key);
         if (projectObjective) {
-            let goal = formatNestedObject(findNestedValue(projectObjective, "goal"));
-            let timeframe = formatNestedObject(findNestedValue(projectObjective, "timeframe"));
-            promptTemplate = promptTemplate.replace(placeholder, `${goal} in ${timeframe}`);
+            let goal = findNestedValue(projectObjective, "goal") || "Unknown goal";
+            let timeframe = findNestedValue(projectObjective, "timeframe") || "Unknown timeframe";
+            let formattedValue = `${goal} in ${timeframe}`;
+            promptTemplate = promptTemplate.replaceAll(placeholder, formattedValue);
+        } else {
+            missingKeys.push(key);
+            console.warn(`Key ${key} not found in user JSON`);
         }
     } else {
+        // Standard key handling
         let value = findNestedValue(userJson, key);
-        promptTemplate = promptTemplate.replace(placeholder, `${key}: ${value}`);
+        if (value !== undefined) {
+            let formattedValue = typeof value === "object" ? formatNestedObject(value) : value;
+            promptTemplate = promptTemplate.replaceAll(placeholder, formattedValue);
+        } else {
+            missingKeys.push(key);
+            console.warn(`Key ${key} not found in user JSON`);
+        }
     }
+}
+
+// Log missing keys if applicable and update the record with the final prompt
+if (missingKeys.length > 0) {
+    console.warn(`Warning: Missing keys in user JSON: ${missingKeys.join(", ")}`);
 }
 
 await assemblePromptTable.updateRecordAsync(recordId, {
@@ -352,7 +372,7 @@ await assemblePromptTable.updateRecordAsync(recordId, {
 ```
 
 ##### Output:
-- **Usable Prompt**: After dynamic value injection, the prompt template is customized with relevant user data, creating a complete and usable LangGraph prompt stored in `⚙️_User_Template_Combination`. This prompt is now ready for the next stage in the ETL pipeline.
+- **Usable Prompt**: After injecting dynamic values, the customized prompt template is stored in ⚙️_User_Template_Combination, ready for subsequent stages in the ETL pipeline. The script logs any missing keys, ensuring traceability of potential data gaps.
 
 ### Output Formatting
 
