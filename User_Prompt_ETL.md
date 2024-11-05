@@ -354,6 +354,51 @@ await assemblePromptTable.updateRecordAsync(recordId, {
 ##### Output:
 - **Usable Prompt**: After dynamic value injection, the prompt template is customized with relevant user data, creating a complete and usable LangGraph prompt stored in `⚙️_User_Template_Combination`. This prompt is now ready for the next stage in the ETL pipeline.
 
+#### 3. Output Formatting
 
+The **Output Formatting** stage finalizes the JSON prompt output by formatting and storing it in a designated field within the `📤_Ouput_Load` table. This ensures the generated prompt content is fully prepared for downstream usage or integration with external systems.
+
+1. **Retrieve and Verify Record**: Checks if the triggered record exists within the `📤_Ouput_Load` table. If the record is missing, the process is terminated.
+2. **Extract JSON Prompt Content**: Accesses the `🔧_JSON_Format_Prompt` field, which contains the formatted JSON prompt. If the field is empty or invalid, the process exits to prevent downstream errors.
+3. **Store JSON Content**: Copies the validated JSON prompt into the `📤_Output_Loading` field, which acts as the final repository for the structured prompt output.
+
+```javascript
+// Get the triggered record ID from the config
+let inputConfig = input.config();
+let recordId = inputConfig.recordId;
+
+// Get the Output_Load table
+let outputLoadTable = base.getTable('📤_Ouput_Load');
+
+// Select the record from the Output_Load table using the record ID
+let record = await outputLoadTable.selectRecordAsync(recordId);
+
+// Check if the record exists
+if (!record) {
+    console.log(`No record found with ID ${recordId}`);
+    return;  // Exit if the record does not exist
+}
+
+// Get the value of the 🔧_JSON_Format_Prompt lookup field
+let jsonFormatLookup = record.getCellValue('🔧_JSON_Format_Prompt');
+
+// Check if the lookup field contains a valid value
+if (!jsonFormatLookup || !Array.isArray(jsonFormatLookup) || jsonFormatLookup.length === 0) {
+    console.log("🔧_JSON_Format_Prompt field is empty or invalid.");
+    return;  // Exit if no valid data is found
+}
+
+// Extract the first value from the lookup array
+let jsonFormattedContent = jsonFormatLookup[0];
+
+// Update the 📤_Output_Loading field with the extracted value
+await outputLoadTable.updateRecordAsync(recordId, {
+    '📤_Output_Loading': jsonFormattedContent  // Store the JSON content in the long-text field
+});
+
+console.log("JSON content successfully copied to 📤_Output_Loading.");
+```
+##### Output:
+- **Formatted JSON Prompt**:The 📤_Output_Loading field in 📤_Ouput_Load now contains the finalized JSON prompt, ready for use in the ETL pipeline’s final stages or external applications.
 
 
